@@ -95,7 +95,7 @@ def main():
             s_target = encoder(raw_next)
 
         pred_diff = predictor(s_curr, action)
-        target_norm = (s_target - s_target.mean(dim=0, keepdim=True)) / (s_target.std(dim=0, keepdim=True) + 1e-5)
+        target_norm = (s_target - s_target.mean(dim=0, keepdim=True)) / (s_target.std(dim=0, keepdim=True, correction=0) + 1e-5)
 
         l_pred = F.mse_loss(pred_diff, target_norm)
         l_sigreg_diff = sigreg_diff(pred_diff)
@@ -108,7 +108,7 @@ def main():
         loss.backward()
         opt.step()
 
-        losses.append(loss.item())
+        losses.append(loss.detach())
         if step >= n_steps - 50:
             latents.append(pred_diff.detach())
 
@@ -135,15 +135,17 @@ def main():
     print(f"Baselines | Frame Differencing SNR: {frame_diff_snr:.3f} | Action-Only Causal Error: {action_only_err:.4f}")
     
     # Check pre-registered criteria: high effective rank, loss convergence, encoder non-zero
-    passed = erank_ratio >= 0.70 and losses[-1] < losses[0] and s_curr.std().item() > 0.10
+    initial_loss_val = float(losses[0].item())
+    final_loss_val = float(losses[-1].item())
+    passed = erank_ratio >= 0.70 and final_loss_val < initial_loss_val and s_curr.std().item() > 0.10
     print(f"Rule evaluation (No dimensional/encoder collapse & loss decreased): {'PASS' if passed else 'FAIL'}")
 
     os.makedirs("results", exist_ok=True)
     manifest = {
         "config": args.config,
         "date": cfg["date"],
-        "initial_loss": losses[0],
-        "final_loss": losses[-1],
+        "initial_loss": initial_loss_val,
+        "final_loss": final_loss_val,
         "effective_rank": erank,
         "erank_ratio": erank_ratio,
         "frame_diff_snr": frame_diff_snr,

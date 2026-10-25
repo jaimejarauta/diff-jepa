@@ -4,10 +4,22 @@ import math
 import torch
 
 def compute_effective_rank(Z: torch.Tensor) -> float:
-    """Computes continuous effective rank via normalized singular value entropy."""
+    """Computes continuous effective rank via normalized singular value entropy.
+    
+    Optimized for tall-and-skinny matrices (M >= N): computes the Gram matrix covariance
+    eigenvalues on device, eliminating MPS threadgroup memory overflow and CPU fallback.
+    """
     with torch.no_grad():
         Z_centered = Z.float() - Z.float().mean(dim=0, keepdim=True)
-        S = torch.linalg.svdvals(Z_centered)
+        m, n = Z_centered.shape
+        if m >= n:
+            cov = torch.mm(Z_centered.T, Z_centered)
+            eigvals = torch.linalg.eigvalsh(cov)
+            S = torch.sqrt(torch.clamp(eigvals, min=0.0))
+        else:
+            cov = torch.mm(Z_centered, Z_centered.T)
+            eigvals = torch.linalg.eigvalsh(cov)
+            S = torch.sqrt(torch.clamp(eigvals, min=0.0))
         total = torch.sum(S)
         if total == 0:
             return 0.0
