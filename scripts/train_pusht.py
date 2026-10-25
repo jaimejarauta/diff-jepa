@@ -51,6 +51,10 @@ def main():
     parser.add_argument("--device", type=str, default=None, help="Device (cuda, mps, cpu)")
     parser.add_argument("--output-manifest", type=str, default="results/pusht_stage2_manifest.json",
                         help="Path to output manifest JSON")
+    parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases telemetry")
+    parser.add_argument("--wandb-project", type=str, default="moonshot-diff-jepa", help="W&B project name")
+    parser.add_argument("--wandb-name", type=str, default=None, help="W&B run display name")
+    parser.add_argument("--wandb-mode", type=str, default=None, choices=["online", "offline", "disabled"], help="W&B mode")
     args = parser.parse_args()
 
     # Device auto-detection: CUDA -> Apple Silicon MPS -> CPU
@@ -67,6 +71,28 @@ def main():
 
     dev_name = torch.cuda.get_device_name(0) if device.type == "cuda" else str(device)
     print(f"Diff-JEPA Push-T Stage 2 Benchmark | Device: {device} ({dev_name})")
+
+    # W&B Initialization
+    use_wandb = args.wandb or (os.environ.get("WANDB_API_KEY") is not None)
+    wandb_run = None
+    if use_wandb:
+        try:
+            import wandb
+            mode = args.wandb_mode or os.environ.get("WANDB_MODE", "online" if os.environ.get("WANDB_API_KEY") else "offline")
+            run_name = args.wandb_name or f"pusht-noise{int(args.noise_ratio*100)}-seed{args.seed}"
+            wandb_run = wandb.init(
+                project=args.wandb_project,
+                group="pusht-affordance",
+                job_type="train",
+                name=run_name,
+                config=vars(args),
+                mode=mode,
+                dir=os.environ.get("WANDB_DIR", "/tmp/wandb")
+            )
+            print(f"[W&B] Initialized run '{run_name}' in project '{args.wandb_project}' (mode: {mode})")
+        except Exception as e:
+            print(f"[W&B Warning] Failed to initialize wandb: {e}. Continuing without W&B.")
+            use_wandb = False
 
     torch.manual_seed(args.seed)
 
@@ -153,9 +179,16 @@ def main():
 
         avg_loss = running_loss / max(1, n_batches)
         epoch_losses.append(avg_loss)
+        lam = predictor.get_lambda().item()
+
+        if use_wandb:
+            wandb.log({
+                "epoch": epoch,
+                "train/loss": avg_loss,
+                "train/lambda": lam,
+            })
 
         if epoch % 5 == 0 or epoch == args.epochs:
-            lam = predictor.get_lambda().item()
             print(f"Epoch {epoch:02d}/{args.epochs:02d} | Loss: {avg_loss:.4f} | Lambda: {lam:.3f}")
 
     train_time = time.time() - t_train_0
@@ -240,6 +273,18 @@ def main():
     print(f"  Affordance Margin (R^2_diff - max(R^2_fd, R^2_untr)): {margin:+.4f} (Required: >= +0.15)")
     print(f"  Effective Rank: {erank_diff:.2f} / {d_total} (Ratio: {erank_ratio:.2f})")
     print(f"  Gate Status: {'PASS' if gate_passed else 'FAIL'}")
+
+    if use_wandb and wandb_run:
+        wandb.summary["r2_diff"] = r2_diff
+        wandb.summary["r2_enc"] = r2_enc
+        wandb.summary["r2_diff_jepa"] = r2_diff_jepa
+        wandb.summary["r2_frame_diff"] = r2_frame_diff
+        wandb.summary["r2_untrained"] = r2_untrained
+        wandb.summary["r2_action_only"] = r2_action_only
+        wandb.summary["affordance_margin"] = margin
+        wandb.summary["effective_rank_ratio"] = erank_ratio
+        wandb.summary["gate_passed"] = gate_passed
+        wandb.finish()
 
     os.makedirs(os.path.dirname(args.output_manifest), exist_ok=True)
     manifest = {
