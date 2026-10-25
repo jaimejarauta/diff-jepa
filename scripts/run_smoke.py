@@ -18,21 +18,36 @@ from diff_jepa.metrics import compute_effective_rank
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/smoke_test.yaml")
+    parser.add_argument("--device", type=str, default=None, help="Device override (cuda, mps, cpu)")
+    parser.add_argument("--steps", type=int, default=None, help="Step override")
+    parser.add_argument("--batch-size", type=int, default=None, help="Batch size override")
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         cfg = yaml.safe_load(f)
 
-    torch.manual_seed(cfg["training"]["seed"])
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Running Diff-JEPA Smoke Test on: {device}")
+    # Device auto-detection: CUDA -> Apple Silicon MPS -> CPU
+    if args.device:
+        device = torch.device(args.device)
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+        torch.set_float32_matmul_precision("high")
+        torch.backends.cudnn.benchmark = True
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
 
+    dev_name = torch.cuda.get_device_name(0) if device.type == "cuda" else str(device)
+    print(f"Running Diff-JEPA Smoke Test on: {device} ({dev_name})")
+
+    torch.manual_seed(cfg["training"]["seed"])
     d_causal = cfg["model"]["d_causal"]
     d_action = cfg["model"]["d_action"]
     d_noise = cfg["model"]["d_noise"]
     d_total = cfg["model"]["d_total"]
-    batch_size = cfg["training"]["batch_size"]
-    n_steps = cfg["training"]["steps"]
+    batch_size = args.batch_size or cfg["training"]["batch_size"]
+    n_steps = args.steps or cfg["training"]["steps"]
 
     encoder = VisualStateEncoder(d_raw=d_total, d_state=d_total).to(device)
     predictor = ActionAsymmetricDualPredictor(

@@ -6,6 +6,7 @@ This document defines the exact workflow, metrics, and branching protocols for d
 
 ## 1. Environment & Setup
 
+### Local GPU & LXC Containers
 ```bash
 # 1. Create and activate virtual environment via uv
 uv venv .venv
@@ -16,7 +17,15 @@ uv pip install -e ".[dev]"
 
 # 3. Verify PyTorch installation and GPU memory
 .venv/bin/python -c "import torch; print('CUDA available:', torch.cuda.is_available(), '| Device Name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+
+# 4. Launch with high-performance Tensor Core execution
+.venv/bin/python scripts/run_smoke.py --config configs/smoke_test.yaml
 ```
+
+### Google Colab (Free T4 or Pro A100/L4)
+1. Open [`notebooks/colab_runner.ipynb`](notebooks/colab_runner.ipynb) in Google Colab.
+2. Ensure GPU runtime is selected (`Runtime -> Change runtime type -> T4 GPU`).
+3. Run all cells: the notebook auto-detects T4 Tensor Cores, installs dependencies with `uv`, runs the Push-T smoke test under 80% background clutter, and evaluates effective rank against pre-registered criteria.
 
 ---
 
