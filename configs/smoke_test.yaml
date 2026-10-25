@@ -1,0 +1,22 @@
+# Diff-JEPA Smoke Test Configuration
+question: "Does action-asymmetric differential subtraction cancel 80% background clutter while preserving ego affordance dynamics?"
+date: "2026-10-25"
+
+model:
+  d_causal: 16
+  d_action: 4
+  d_noise: 64
+  d_total: 80
+  d_out: 80
+
+training:
+  lr: 0.001
+  gamma_sigreg: 0.05
+  steps: 250
+  batch_size: 64
+  seed: 1337
+
+pre_registered_rules:
+  pass_rule: "probe_r2_diff >= 0.85 and erank_ratio >= 0.70"
+  kill_rule: "probe_r2_diff < probe_r2_untrained + 0.10"
+  max_runtime_sec: 180
