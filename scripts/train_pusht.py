@@ -20,6 +20,7 @@ from diff_jepa.pusht import (
     generate_synthetic_pusht_trajectories,
     create_pusht_dataloader,
     fit_ridge_probe,
+    fit_mlp_probe,
     PushTDataset,
 )
 
@@ -250,15 +251,21 @@ def main():
     erank_diff = compute_effective_rank(val_diff)
     erank_ratio = erank_diff / d_total
 
-    # Fit Ridge probes on representations
+    # Fit Ridge linear probes on representations
     r2_diff, r2_diff_dict = fit_ridge_probe(tr_diff, tr_y, val_diff, val_y)
     r2_enc, r2_enc_dict = fit_ridge_probe(tr_enc, tr_y, val_enc, val_y)
     r2_frame_diff, r2_fd_dict = fit_ridge_probe(tr_fd, tr_y, val_fd, val_y)
     r2_action_only, r2_act_dict = fit_ridge_probe(tr_act, tr_y, val_act, val_y)
     r2_untrained, r2_untr_dict = fit_ridge_probe(tr_untr, tr_y, val_untr, val_y)
 
+    # Fit non-linear MLP probes to evaluate non-Euclidean SO(2) manifold recovery
+    r2_mlp_diff, r2_mlp_diff_dict = fit_mlp_probe(tr_diff, tr_y, val_diff, val_y, hidden_dim=64, epochs=100)
+    r2_mlp_enc, r2_mlp_enc_dict = fit_mlp_probe(tr_enc, tr_y, val_enc, val_y, hidden_dim=64, epochs=100)
+    r2_mlp_fd, _ = fit_mlp_probe(tr_fd, tr_y, val_fd, val_y, hidden_dim=64, epochs=100)
+
     # Use the best representation learned by Diff-JEPA (differential update or state encoder)
     r2_diff_jepa = max(r2_diff, r2_enc)
+    r2_diff_jepa_mlp = max(r2_mlp_diff, r2_mlp_enc)
 
     print(f"\nLinear Affordance Probe Evaluation Results (Predicting T-block pose [x, y, cos(th), sin(th)]):")
     print(f"  1. Diff-JEPA (Differential Latent): R^2 = {r2_diff:.4f} {r2_diff_dict}")
@@ -266,6 +273,11 @@ def main():
     print(f"  3. Frame Differencing baseline:     R^2 = {r2_frame_diff:.4f} {r2_fd_dict}")
     print(f"  4. Untrained Random Encoder:        R^2 = {r2_untrained:.4f} {r2_untr_dict}")
     print(f"  5. Action-Only Kinematics:          R^2 = {r2_action_only:.4f} {r2_act_dict}")
+
+    print(f"\nNon-Linear MLP Affordance Probe (SO(2) Manifold Probing):")
+    print(f"  1. Diff-JEPA MLP (Diff):           R^2 = {r2_mlp_diff:.4f} {r2_mlp_diff_dict}")
+    print(f"  2. Diff-JEPA MLP (Visual Enc):     R^2 = {r2_mlp_enc:.4f} {r2_mlp_enc_dict}")
+    print(f"  3. Frame Differencing MLP:         R^2 = {r2_mlp_fd:.4f}")
 
     best_baseline = max(r2_frame_diff, r2_untrained)
     margin = r2_diff_jepa - best_baseline
@@ -296,8 +308,10 @@ def main():
         "git_commit": get_git_hash(),
         "config": vars(args),
         "r2_diff_jepa": r2_diff_jepa,
+        "r2_diff_jepa_mlp": r2_diff_jepa_mlp,
         "r2_diff_latent": r2_diff,
         "r2_encoder_latent": r2_enc,
+        "r2_encoder_mlp_dict": r2_mlp_enc_dict,
         "r2_frame_diff": r2_frame_diff,
         "r2_untrained": r2_untrained,
         "r2_action_only": r2_action_only,

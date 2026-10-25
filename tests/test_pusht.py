@@ -6,6 +6,7 @@ from diff_jepa.pusht import (
     generate_synthetic_pusht_trajectories,
     create_pusht_dataloader,
     fit_ridge_probe,
+    fit_mlp_probe,
     PushTDataset,
 )
 
@@ -109,3 +110,25 @@ def test_ridge_probe_noise_isolation():
 
     mean_r2, _ = fit_ridge_probe(train_x, train_y, val_x, val_y, alpha=1.0)
     assert mean_r2 < 0.15, f"Expected low R^2 for random noise, got {mean_r2}"
+
+def test_mlp_probe_non_linear_recovery():
+    torch.manual_seed(42)
+    n_train = 600
+    n_val = 150
+    d_in = 16
+
+    # Non-linear circular target mapping: y = [cos(2*x0), sin(2*x1)]
+    train_x = torch.randn(n_train, d_in)
+    train_y = torch.stack([torch.cos(2.0 * train_x[:, 0]), torch.sin(2.0 * train_x[:, 1])], dim=1)
+
+    val_x = torch.randn(n_val, d_in)
+    val_y = torch.stack([torch.cos(2.0 * val_x[:, 0]), torch.sin(2.0 * val_x[:, 1])], dim=1)
+
+    # Linear probe fails on circular harmonics
+    r2_linear, _ = fit_ridge_probe(train_x, train_y, val_x, val_y, alpha=1.0, dim_names=["cos", "sin"])
+    assert r2_linear < 0.40, f"Expected linear probe to struggle on circular non-linearity, got {r2_linear}"
+
+    # 2-layer MLP probe successfully captures circular non-linearity
+    r2_mlp, mlp_dict = fit_mlp_probe(train_x, train_y, val_x, val_y, hidden_dim=64, epochs=150, lr=0.02, dim_names=["cos", "sin"])
+    assert r2_mlp > 0.80, f"Expected MLP probe to recover non-linear representation, got {r2_mlp}"
+    assert "cos" in mlp_dict and "sin" in mlp_dict

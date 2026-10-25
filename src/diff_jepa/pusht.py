@@ -77,6 +77,78 @@ def fit_ridge_probe(
     mean_r2 = max(-1.0, r2_per_dim.mean().item())
     return mean_r2, r2_dict
 
+def fit_mlp_probe(
+    train_x: torch.Tensor,
+    train_y: torch.Tensor,
+    val_x: torch.Tensor,
+    val_y: torch.Tensor,
+    hidden_dim: int = 64,
+    epochs: int = 100,
+    lr: float = 0.01,
+    weight_decay: float = 1e-4,
+    dim_names: Optional[List[str]] = None
+) -> Tuple[float, Dict[str, float]]:
+    """Fits a non-linear 2-layer MLP probe (GeLU) on representations to evaluate
+    whether non-linear continuous manifolds (such as SO(2) rotation) are captured.
+    Returns: (mean_r2, per_dimension_r2_dict).
+    """
+    device = train_x.device
+    dtype = train_x.dtype
+
+    # Standardize input features
+    x_mean = train_x.mean(dim=0, keepdim=True)
+    x_std = train_x.std(dim=0, keepdim=True).clamp(min=1e-5)
+    tr_x_norm = (train_x - x_mean) / x_std
+    val_x_norm = (val_x - x_mean) / x_std
+
+    d_in = train_x.size(1)
+    d_out = train_y.size(1)
+
+    mlp = torch.nn.Sequential(
+        torch.nn.Linear(d_in, hidden_dim),
+        torch.nn.GELU(),
+        torch.nn.Linear(hidden_dim, d_out)
+    ).to(device=device, dtype=dtype)
+
+    opt = torch.optim.Adam(mlp.parameters(), lr=lr, weight_decay=weight_decay)
+
+    # Fast batch training on frozen features
+    batch_size = min(256, train_x.size(0))
+    n_samples = train_x.size(0)
+
+    mlp.train()
+    for _ in range(epochs):
+        perm = torch.randperm(n_samples, device=device)
+        for i in range(0, n_samples, batch_size):
+            idx = perm[i:i + batch_size]
+            pred = mlp(tr_x_norm[idx])
+            loss = torch.nn.functional.mse_loss(pred, train_y[idx])
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+
+    mlp.eval()
+    with torch.no_grad():
+        preds = mlp(val_x_norm)
+        ss_res = torch.sum((val_y - preds) ** 2, dim=0)
+        val_y_mean = torch.mean(val_y, dim=0, keepdim=True)
+        ss_tot = torch.sum((val_y - val_y_mean) ** 2, dim=0)
+        r2_per_dim = 1.0 - (ss_res / torch.clamp(ss_tot, min=1e-8))
+
+    if dim_names is None:
+        if val_y.size(1) == 3:
+            dim_names = ["x_block", "y_block", "theta_block"]
+        else:
+            dim_names = ["x_block", "y_block", "cos_theta", "sin_theta"]
+
+    r2_dict = {}
+    for i, name in enumerate(dim_names):
+        if i < r2_per_dim.numel():
+            r2_dict[name] = max(-1.0, r2_per_dim[i].item())
+
+    mean_r2 = max(-1.0, r2_per_dim.mean().item())
+    return mean_r2, r2_dict
+
 def generate_synthetic_pusht_trajectories(
     num_trajectories: int = 100,
     trajectory_length: int = 50,
