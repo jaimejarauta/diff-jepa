@@ -10,10 +10,13 @@ behaviour of yours, mine wins. If a rule blocks something you need, stop and tel
 | Dual-head predictive architecture & lambda clamping | `src/diff_jepa/models.py` |
 | Sketched Isotropic Gaussian Regularization (SIGReg) | `src/diff_jepa/sigreg.py` |
 | Metrics: erank, contrast ratio, linear probes | `src/diff_jepa/metrics.py` |
+| Push-T trajectory generator, dataset & Ridge probe | `src/diff_jepa/pusht.py` |
 | Smoke test configuration & pre-registered pass/fail rules | `configs/smoke_test.yaml` |
 | Execution script for Day 2 Push-T smoke test | `scripts/run_smoke.py` |
+| Stage 2 Push-T affordance benchmark training script | `scripts/train_pusht.py` |
 | Unattended execution watchdog & pre-flight busy check | `scripts/watchdog.sh` |
 | Unit tests for SIGReg & asymmetric heads | `tests/test_sigreg.py`, `tests/test_asymmetric_heads.py` |
+| Unit tests for Push-T loader and probes | `tests/test_pusht.py` |
 | Step-by-step onboarding, branching, W&B setup | `START_CODING.md` |
 
 ## Test Commands
