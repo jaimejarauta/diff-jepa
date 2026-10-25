@@ -46,7 +46,7 @@ def main():
     parser.add_argument("--num-val-trajs", type=int, default=30, help="Number of validation trajectories")
     parser.add_argument("--traj-len", type=int, default=50, help="Trajectory length")
     parser.add_argument("--d-causal", type=int, default=16, help="Causal state dimension")
-    parser.add_argument("--noise-ratio", type=float, default=0.80, help="Noise dimension ratio (default: 80%)")
+    parser.add_argument("--noise-ratio", type=float, default=0.80, help="Noise dimension ratio (default: 0.80)")
     parser.add_argument("--seed", type=int, default=1337, help="Random seed")
     parser.add_argument("--device", type=str, default=None, help="Device (cuda, mps, cpu)")
     parser.add_argument("--output-manifest", type=str, default="results/pusht_stage2_manifest.json",
@@ -162,7 +162,7 @@ def main():
                 s_target = encoder(obs_next)
 
             pred_diff = predictor(s_curr, action)
-            target_norm = (s_target - s_target.mean(dim=0, keepdim=True)) / (s_target.std(dim=0, keepdim=True) + 1e-5)
+            target_norm = (s_target - s_target.mean(dim=0, keepdim=True)) / (s_target.std(dim=0, keepdim=True, correction=0) + 1e-5)
 
             l_pred = F.mse_loss(pred_diff, target_norm)
             l_sigreg_diff = sigreg_diff(pred_diff)
