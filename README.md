@@ -21,7 +21,7 @@ python scripts/train_pusht.py --trajectories 50 --epochs 200 --wandb
 ```
 
 ### Google Colab:
-Open `notebooks/colab_runner.ipynb` in Colab on a T4 GPU. Includes automatic machine teardown (`runtime.unassign()`) to protect compute credits upon completion.
+Open `notebooks/colab_runner_diff_jepa.ipynb` in Colab on a T4 GPU. Includes automatic machine teardown (`runtime.unassign()`) to protect compute credits upon completion.
 
 ## Telemetry
 Native Weights & Biases support via `--wandb` (project: `moonshot-diff-jepa`).
