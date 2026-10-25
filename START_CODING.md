@@ -45,14 +45,18 @@ uv pip install -e ".[dev]"
 Does subtracting an unconditioned passive background head ($z_2(s_t, \mathbf{0})$) from an action-conditioned causal head ($z_1(s_t, a_t)$) with SIGReg regularizing the residual difference $\Delta z$ isolate causal affordances and prevent background clutter from corrupting visual world model rollouts?
 
 ### Key Performance Indicators (KPIs)
-1. **Effective Rank ($\text{erank}$):** $\text{erank}(\Delta Z) \ge 0.85 \times D$ (confirming zero dimensional collapse).
+1. **Effective Rank ($\text{erank}$):** $\text{erank}(\Delta Z) \ge 0.85 \times D$ (confirming zero dimensional collapse across causal updates).
 2. **Saliency Contrast Ratio (CR):** Gradient energy on foreground pixels vs background distractors $\text{CR}_{\text{diff}} \ge 4.0 \times \text{CR}_{\text{standard}}$.
-3. **Decoupled Probe $R^2$:** Linear probe on frozen $\Delta z$ predicting end-effector velocity $R^2 \ge 0.85$ (vs $<0.65$ for standard JEPA under clutter).
-4. **Untrained Control Delta:** $R^2_{\text{trained}} - R^2_{\text{untrained}} \ge 0.15$.
+3. **Causal T-Block Probe $R^2$:** Linear probe on frozen $\Delta z$ predicting manipulated T-block pose and velocity $(x_b, y_b, \theta_b, \dot{x}_b, \dot{y}_b)$ achieving $R^2 \ge 0.80$ under 80% background clutter (vs $<0.55$ for standard JEPA).
+4. **Baselines Contrast:**
+   - Outperforms Frame Differencing baseline ($\Delta x_t = x_t - x_{t-1}$) which fails under dynamic background jitter.
+   - Outperforms Action-Only kinematic baseline which cannot observe external object interactions.
+   - Untrained Control Delta: $R^2_{\text{diff}} - R^2_{\text{untrained}} \ge 0.15$ on T-block pose.
 
 ### Pre-Registered Rules
-- **Kill Criterion (Day 3 Gate):** If on the noisy Push-T benchmark, the linear probe $R^2$ on held-out trajectories is not at least $0.10$ higher than the untrained control ($R^2_{\text{diff}} - R^2_{\text{untrained}} < 0.10$), kill immediately.
-- **Pulse Criterion:** If Diff-JEPA achieves $R^2 \ge 0.85$ on end-effector velocity while standard JEPA drops to $\le 0.65$ under 80% background noise, double down for nuPlan/Franka scaling.
+- **Kill Criterion (Day 3 Gate):** If on the noisy Push-T benchmark, the linear probe $R^2$ for T-block object pose on held-out trajectories is not at least $0.15$ higher than both Frame Differencing and Untrained Control ($R^2_{\text{diff}} - \max(R^2_{\text{frame\_diff}}, R^2_{\text{untrained}}) < 0.15$), kill immediately and archive as a controlled null.
+- **Pulse Criterion:** If Diff-JEPA achieves $R^2 \ge 0.80$ on manipulated T-block pose while standard JEPA drops to $\le 0.55$ under 80% background noise, double down for nuPlan/Franka scaling.
+- **Latent Normalization Invariant:** Differential vectors $\Delta z$ are standardized per feature across mini-batches (mean 0, std 1) rather than spherically normalized, matching $\mathcal{N}(0, 1)$ assumptions of SIGReg Epps-Pulley projections.
 
 ---
 
@@ -96,3 +100,4 @@ uptime
 # 3. Launch smoke test (under 5 minutes)
 .venv/bin/python scripts/run_smoke.py --config configs/smoke_test.yaml
 ```
+

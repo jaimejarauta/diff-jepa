@@ -12,6 +12,7 @@ behaviour of yours, mine wins. If a rule blocks something you need, stop and tel
 | Metrics: erank, contrast ratio, linear probes | `src/diff_jepa/metrics.py` |
 | Smoke test configuration & pre-registered pass/fail rules | `configs/smoke_test.yaml` |
 | Execution script for Day 2 Push-T smoke test | `scripts/run_smoke.py` |
+| Unattended execution watchdog & pre-flight busy check | `scripts/watchdog.sh` |
 | Unit tests for SIGReg & asymmetric heads | `tests/test_sigreg.py`, `tests/test_asymmetric_heads.py` |
 | Step-by-step onboarding, branching, W&B setup | `START_CODING.md` |
 
@@ -129,3 +130,4 @@ people. Colab is the overflow.
 
 - Only public data and permissive-licence code; record the licence of every dataset and model used.
 - Nothing destructive, no scraping against terms of service, no secrets in the repo.
+

@@ -33,3 +33,4 @@ To mathematically enforce semantic directionality:
 - **Head 2 (Passive):** $z_2 = P_2(s_t, \mathbf{0})$. Receives a zero-action token ($a_t \perp z_2$).
 
 Because head 2 is blind to $a_t$, it cannot predict action-induced displacements of the pusher or manipulated object. It is strictly constrained to model passive environment drift and background textures. When subtracted via $\Delta z = z_1 - \lambda z_2$, the common background mode is cancelled, leaving the action-induced affordance intact.
+

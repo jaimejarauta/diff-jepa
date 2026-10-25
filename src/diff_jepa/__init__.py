@@ -10,3 +10,4 @@ __all__ = [
     "compute_effective_rank",
     "compute_contrast_ratio",
 ]
+

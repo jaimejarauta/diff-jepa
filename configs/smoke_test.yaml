@@ -20,3 +20,4 @@ pre_registered_rules:
   pass_rule: "probe_r2_diff >= 0.85 and erank_ratio >= 0.70"
   kill_rule: "probe_r2_diff < probe_r2_untrained + 0.10"
   max_runtime_sec: 180
+

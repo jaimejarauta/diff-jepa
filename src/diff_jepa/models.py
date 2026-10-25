@@ -6,6 +6,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class VisualStateEncoder(nn.Module):
+    """Visual/sensory encoder mapping raw observations to state latent representations."""
+    def __init__(self, d_raw: int, d_state: int):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(d_raw, d_state * 2),
+            nn.LayerNorm(d_state * 2),
+            nn.GELU(),
+            nn.Linear(d_state * 2, d_state),
+            nn.LayerNorm(d_state)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
 class ActionAsymmetricDualPredictor(nn.Module):
     """Predictor with an action-conditioned causal head and an unconditioned passive background head."""
     def __init__(self, d_state: int, d_action: int, d_out: int,
@@ -38,11 +53,17 @@ class ActionAsymmetricDualPredictor(nn.Module):
         return self.lambda_min + (self.lambda_max - self.lambda_min) * torch.sigmoid(self.raw_lambda)
 
     def forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        """Computes action-asymmetric differential representation."""
+        """Computes action-asymmetric differential representation with standardized variance."""
         zero_action = torch.zeros_like(action)
         z1 = self.causal_head(torch.cat([state, action], dim=-1))
         z2 = self.passive_head(torch.cat([state, zero_action], dim=-1))
         
         lam = self.get_lambda()
         diff = z1 - lam * z2
-        return F.normalize(diff, dim=-1)
+        
+        # Standardize mean and standard deviation per feature so 1D projections match N(0, 1) variance for SIGReg
+        # (Avoid spherical F.normalize which collapses 1D projection variance to 1/D)
+        diff_mean = diff.mean(dim=0, keepdim=True)
+        diff_std = diff.std(dim=0, keepdim=True) + 1e-5
+        return (diff - diff_mean) / diff_std
+

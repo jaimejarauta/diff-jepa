@@ -1,7 +1,7 @@
 """Unit tests for Sketched Isotropic Gaussian Regularization (SIGReg)."""
 
 import torch
-from diff_jepa.sigreg import compute_sigreg_epps_pulley
+from diff_jepa.sigreg import compute_sigreg_epps_pulley, SIGRegLoss
 from diff_jepa.metrics import compute_effective_rank
 
 def test_sigreg_standard_normal():
@@ -15,6 +15,17 @@ def test_sigreg_standard_normal():
     loss_collapsed = compute_sigreg_epps_pulley(z_collapsed).item()
     
     assert loss_normal < loss_collapsed, f"Expected normal loss ({loss_normal}) < collapsed loss ({loss_collapsed})"
+
+def test_sigreg_module_buffer_persistence():
+    torch.manual_seed(42)
+    sigreg = SIGRegLoss(d=64, n_slices=16)
+    assert hasattr(sigreg, "proj")
+    assert sigreg.proj.shape == (64, 16)
+    
+    z = torch.randn(64, 64)
+    loss = sigreg(z)
+    assert torch.isfinite(loss)
+    assert loss.item() >= 0.0
 
 def test_effective_rank_computation():
     torch.manual_seed(42)
@@ -30,3 +41,4 @@ def test_effective_rank_computation():
     
     assert erank_full > 20.0, f"Expected full erank > 20, got {erank_full}"
     assert erank_rank1 < 2.0, f"Expected rank 1 erank < 2, got {erank_rank1}"
+

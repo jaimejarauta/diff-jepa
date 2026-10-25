@@ -21,3 +21,4 @@ def compute_contrast_ratio(saliency: torch.Tensor, fg_mask: torch.Tensor, bg_mas
         fg_energy = torch.mean(saliency[fg_mask])
         bg_energy = torch.mean(saliency[bg_mask])
         return (fg_energy / max(1e-8, bg_energy)).item()
+

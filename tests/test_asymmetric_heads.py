@@ -27,3 +27,4 @@ def test_lambda_clamping():
     
     predictor.raw_lambda.data.fill_(-100.0)
     assert abs(predictor.get_lambda().item() - 0.20) < 1e-4
+
