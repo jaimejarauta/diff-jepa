@@ -1,0 +1,13 @@
+{
+  "config": "configs/smoke_test.yaml",
+  "date": "2026-10-25",
+  "initial_loss": 1.9679279327392578,
+  "final_loss": 0.04931292682886124,
+  "effective_rank": 59.516758869836956,
+  "erank_ratio": 0.7439594858729619,
+  "frame_diff_snr": 1.9081355344387347,
+  "action_only_err": 1.4912306070327759,
+  "final_lambda": 0.6876077651977539,
+  "passed": true,
+  "elapsed_sec": 2.268099069595337
+}
