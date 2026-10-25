@@ -23,20 +23,26 @@ def fit_ridge_probe(
     train_y: torch.Tensor,
     val_x: torch.Tensor,
     val_y: torch.Tensor,
-    alpha: float = 1e-2
+    alpha: float = 1.0
 ) -> Tuple[float, Dict[str, float]]:
-    """Fits a Ridge linear regression probe on representations to predict T-block pose.
+    """Fits a standardized Ridge linear regression probe on representations to predict T-block pose.
     Returns: (mean_r2, per_dimension_r2_dict).
     """
     device = train_x.device
     dtype = train_x.dtype
 
-    # Add bias term (prepend column of 1s)
-    ones_train = torch.ones(train_x.size(0), 1, device=device, dtype=dtype)
-    x_aug = torch.cat([train_x, ones_train], dim=1)  # (N, D + 1)
+    # Standardize input features to ensure well-conditioned Ridge normal equations
+    x_mean = train_x.mean(dim=0, keepdim=True)
+    x_std = train_x.std(dim=0, keepdim=True).clamp(min=1e-5)
+    tr_x_norm = (train_x - x_mean) / x_std
+    val_x_norm = (val_x - x_mean) / x_std
 
-    ones_val = torch.ones(val_x.size(0), 1, device=device, dtype=dtype)
-    val_x_aug = torch.cat([val_x, ones_val], dim=1)
+    # Add bias term (prepend column of 1s)
+    ones_train = torch.ones(tr_x_norm.size(0), 1, device=device, dtype=dtype)
+    x_aug = torch.cat([tr_x_norm, ones_train], dim=1)  # (N, D + 1)
+
+    ones_val = torch.ones(val_x_norm.size(0), 1, device=device, dtype=dtype)
+    val_x_aug = torch.cat([val_x_norm, ones_val], dim=1)
 
     d_dim = x_aug.size(1)
     reg = alpha * torch.eye(d_dim, device=device, dtype=dtype)
@@ -88,10 +94,11 @@ def generate_synthetic_pusht_trajectories(
 
     trajectories: List[PushTTrajectory] = []
 
-    # Projection matrix to embed physical 7D causal states into d_causal space
-    # Physical states: [agent_x, agent_y, block_x, block_y, cos(theta), sin(theta), goal_x, goal_y] -> 8D
+    # Fixed deterministic projection matrix for physical world causal embedding (constant sensor geometry)
     d_phys = 8
-    w_causal_proj = torch.randn(d_phys, d_causal, generator=gen, device=device) / math.sqrt(d_phys)
+    proj_gen = torch.Generator(device=device)
+    proj_gen.manual_seed(42)
+    w_causal_proj = torch.randn(d_phys, d_causal, generator=proj_gen, device=device) / math.sqrt(d_phys)
 
     contact_radius = 0.25
 
