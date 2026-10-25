@@ -1,6 +1,6 @@
 {
   "date": "2026-10-25",
-  "git_commit": "3718e54ef91c91355144bb4136fc3758cfdb05aa",
+  "git_commit": "a936854fd4366b2a622f9e5abbd3ba6357627a43",
   "config": {
     "epochs": 80,
     "lr": 0.001,
@@ -19,17 +19,17 @@
     "wandb_name": null,
     "wandb_mode": null
   },
-  "r2_diff_jepa": 0.5404119491577148,
-  "r2_diff_latent": 0.36727747321128845,
-  "r2_encoder_latent": 0.5404119491577148,
-  "r2_frame_diff": 0.39386317133903503,
-  "r2_untrained": -0.11746251583099365,
-  "r2_action_only": 0.41863325238227844,
-  "r2_margin": 0.1465487778186798,
-  "gate_passed": false,
+  "r2_diff_jepa": 0.18778298795223236,
+  "r2_diff_latent": -0.4155881702899933,
+  "r2_encoder_latent": 0.18778298795223236,
+  "r2_frame_diff": -0.2989807426929474,
+  "r2_untrained": -0.8437219858169556,
+  "r2_action_only": -0.2929835915565491,
+  "r2_margin": 0.48676373064517975,
+  "gate_passed": true,
   "effective_rank": 59.72714036310918,
   "erank_ratio": 0.7465892545388647,
   "final_lambda": 0.7110036611557007,
   "final_loss": 0.07776993101364688,
-  "training_time_sec": 16.981493949890137
+  "training_time_sec": 13.528309106826782
 }

@@ -23,7 +23,8 @@ def fit_ridge_probe(
     train_y: torch.Tensor,
     val_x: torch.Tensor,
     val_y: torch.Tensor,
-    alpha: float = 1.0
+    alpha: float = 1.0,
+    dim_names: Optional[List[str]] = None
 ) -> Tuple[float, Dict[str, float]]:
     """Fits a standardized Ridge linear regression probe on representations to predict T-block pose.
     Returns: (mean_r2, per_dimension_r2_dict).
@@ -62,7 +63,12 @@ def fit_ridge_probe(
     ss_tot = torch.sum((val_y - val_y_mean) ** 2, dim=0)
     r2_per_dim = 1.0 - (ss_res / torch.clamp(ss_tot, min=1e-8))
 
-    dim_names = ["x_block", "y_block", "theta_block"]
+    if dim_names is None:
+        if val_y.size(1) == 3:
+            dim_names = ["x_block", "y_block", "theta_block"]
+        else:
+            dim_names = ["x_block", "y_block", "cos_theta", "sin_theta"]
+
     r2_dict = {}
     for i, name in enumerate(dim_names):
         if i < r2_per_dim.numel():

@@ -223,12 +223,16 @@ def main():
                 # Frame Differencing baseline: delta_x = x_next - x_curr
                 delta_x = o_n - o_c
 
+                raw_pose = b["block_pose_next"].to(device)
+                # Continuous SO(2) manifold pose [x, y, cos(theta), sin(theta)] eliminating angle branch cut
+                cont_pose = torch.cat([raw_pose[:, :2], torch.cos(raw_pose[:, 2:3]), torch.sin(raw_pose[:, 2:3])], dim=-1)
+
                 diff_reps.append(diff)
                 enc_reps.append(s_c)
                 frame_diff_reps.append(delta_x)
                 action_reps.append(act)
                 untrained_reps.append(s_untr)
-                target_poses.append(target_pose)
+                target_poses.append(cont_pose)
 
         return (
             torch.cat(diff_reps, dim=0),
@@ -256,7 +260,7 @@ def main():
     # Use the best representation learned by Diff-JEPA (differential update or state encoder)
     r2_diff_jepa = max(r2_diff, r2_enc)
 
-    print(f"\nLinear Affordance Probe Evaluation Results (Predicting T-block pose [x, y, theta]):")
+    print(f"\nLinear Affordance Probe Evaluation Results (Predicting T-block pose [x, y, cos(th), sin(th)]):")
     print(f"  1. Diff-JEPA (Differential Latent): R^2 = {r2_diff:.4f} {r2_diff_dict}")
     print(f"  2. Diff-JEPA (Visual Encoder):     R^2 = {r2_enc:.4f} {r2_enc_dict}")
     print(f"  3. Frame Differencing baseline:     R^2 = {r2_frame_diff:.4f} {r2_fd_dict}")
