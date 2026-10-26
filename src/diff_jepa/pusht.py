@@ -3,7 +3,7 @@ Models 2D agent end-effector, 2D T-block position/orientation, and dynamic backg
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import math
 import numpy as np
 import torch
@@ -309,6 +309,7 @@ class PushTDataset(Dataset):
                     "action": traj.actions[t],
                     "block_pose_curr": traj.block_pose[t],
                     "block_pose_next": traj.block_pose[t + 1],
+                    "target_pose": traj.block_pose[t + 1],
                     "agent_pos_curr": traj.agent_pos[t],
                     "agent_pos_next": traj.agent_pos[t + 1],
                 })
@@ -320,10 +321,13 @@ class PushTDataset(Dataset):
         return self.transitions[idx]
 
 def create_pusht_dataloader(
-    trajectories: List[PushTTrajectory],
+    trajectories: Any,
     batch_size: int = 64,
     shuffle: bool = True
 ) -> DataLoader:
-    """Builds a batched DataLoader from a list of PushT trajectories."""
-    dataset = PushTDataset(trajectories)
+    """Builds a batched DataLoader from a list of PushT trajectories or an existing Dataset."""
+    if isinstance(trajectories, (PushTDataset, Dataset)):
+        dataset = trajectories
+    else:
+        dataset = PushTDataset(trajectories)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, drop_last=True)

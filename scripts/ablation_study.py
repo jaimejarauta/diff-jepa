@@ -108,7 +108,7 @@ def run_ablation_arm(
                 else:
                     rep = predictor.causal_head(torch.cat([s_curr, action], dim=-1))
                 reps.append(rep.cpu())
-                targets.append(batch["target_pose"].cpu())
+                targets.append(batch.get("target_pose", batch.get("block_pose_next")).cpu())
         return torch.cat(reps, dim=0), torch.cat(targets, dim=0)
 
     tr_x, tr_y = extract_reps(train_dataset)
@@ -167,7 +167,7 @@ def main():
         for batch in loader:
             fd = batch["obs_next"] - batch["obs_curr"]
             reps.append(fd.cpu())
-            targets.append(batch["target_pose"].cpu())
+            targets.append(batch.get("target_pose", batch.get("block_pose_next")).cpu())
         return torch.cat(reps, dim=0), torch.cat(targets, dim=0)
 
     tr_fd, tr_y = extract_fd(train_dataset)
