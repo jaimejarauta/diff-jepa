@@ -61,9 +61,6 @@ class ActionAsymmetricDualPredictor(nn.Module):
         lam = self.get_lambda()
         diff = z1 - lam * z2
         
-        # Standardize mean and standard deviation per feature so 1D projections match N(0, 1) variance for SIGReg
-        # (Avoid spherical F.normalize which collapses 1D projection variance to 1/D)
-        diff_mean = diff.mean(dim=0, keepdim=True)
-        diff_std = diff.std(dim=0, keepdim=True, correction=0) + 1e-5
-        return (diff - diff_mean) / diff_std
+        # Raw Euclidean scale preserved; no batch standardization (which distorts geometry and induces batch dependency)
+        return diff
 

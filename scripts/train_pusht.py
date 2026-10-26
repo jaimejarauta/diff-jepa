@@ -207,6 +207,7 @@ def main():
         frame_diff_reps = []
         action_reps = []
         untrained_reps = []
+        raw_reps = []
         target_poses = []
 
         loader = torch.utils.data.DataLoader(dataset, batch_size=128, shuffle=False)
@@ -233,6 +234,7 @@ def main():
                 frame_diff_reps.append(delta_x)
                 action_reps.append(act)
                 untrained_reps.append(s_untr)
+                raw_reps.append(o_c)
                 target_poses.append(cont_pose)
 
         return (
@@ -241,11 +243,12 @@ def main():
             torch.cat(frame_diff_reps, dim=0),
             torch.cat(action_reps, dim=0),
             torch.cat(untrained_reps, dim=0),
+            torch.cat(raw_reps, dim=0),
             torch.cat(target_poses, dim=0),
         )
 
-    tr_diff, tr_enc, tr_fd, tr_act, tr_untr, tr_y = extract_features(train_dataset)
-    val_diff, val_enc, val_fd, val_act, val_untr, val_y = extract_features(val_dataset)
+    tr_diff, tr_enc, tr_fd, tr_act, tr_untr, tr_raw, tr_y = extract_features(train_dataset)
+    val_diff, val_enc, val_fd, val_act, val_untr, val_raw, val_y = extract_features(val_dataset)
 
     # Measure representation health: effective rank
     erank_diff = compute_effective_rank(val_diff)
@@ -257,15 +260,16 @@ def main():
     r2_frame_diff, r2_fd_dict = fit_ridge_probe(tr_fd, tr_y, val_fd, val_y)
     r2_action_only, r2_act_dict = fit_ridge_probe(tr_act, tr_y, val_act, val_y)
     r2_untrained, r2_untr_dict = fit_ridge_probe(tr_untr, tr_y, val_untr, val_y)
+    r2_raw, r2_raw_dict = fit_ridge_probe(tr_raw, tr_y, val_raw, val_y)
 
     # Fit non-linear MLP probes to evaluate non-Euclidean SO(2) manifold recovery
     r2_mlp_diff, r2_mlp_diff_dict = fit_mlp_probe(tr_diff, tr_y, val_diff, val_y, hidden_dim=64, epochs=100)
     r2_mlp_enc, r2_mlp_enc_dict = fit_mlp_probe(tr_enc, tr_y, val_enc, val_y, hidden_dim=64, epochs=100)
     r2_mlp_fd, _ = fit_mlp_probe(tr_fd, tr_y, val_fd, val_y, hidden_dim=64, epochs=100)
 
-    # Use the best representation learned by Diff-JEPA (differential update or state encoder)
-    r2_diff_jepa = max(r2_diff, r2_enc)
-    r2_diff_jepa_mlp = max(r2_mlp_diff, r2_mlp_enc)
+    # Pre-registered arm: evaluate learned differential update without post-hoc selection
+    r2_diff_jepa = r2_diff
+    r2_diff_jepa_mlp = r2_mlp_diff
 
     print(f"\nLinear Affordance Probe Evaluation Results (Predicting T-block pose [x, y, cos(th), sin(th)]):")
     print(f"  1. Diff-JEPA (Differential Latent): R^2 = {r2_diff:.4f} {r2_diff_dict}")
@@ -273,13 +277,14 @@ def main():
     print(f"  3. Frame Differencing baseline:     R^2 = {r2_frame_diff:.4f} {r2_fd_dict}")
     print(f"  4. Untrained Random Encoder:        R^2 = {r2_untrained:.4f} {r2_untr_dict}")
     print(f"  5. Action-Only Kinematics:          R^2 = {r2_action_only:.4f} {r2_act_dict}")
+    print(f"  6. Raw Observation Probe:           R^2 = {r2_raw:.4f} {r2_raw_dict}")
 
     print(f"\nNon-Linear MLP Affordance Probe (SO(2) Manifold Probing):")
     print(f"  1. Diff-JEPA MLP (Diff):           R^2 = {r2_mlp_diff:.4f} {r2_mlp_diff_dict}")
     print(f"  2. Diff-JEPA MLP (Visual Enc):     R^2 = {r2_mlp_enc:.4f} {r2_mlp_enc_dict}")
     print(f"  3. Frame Differencing MLP:         R^2 = {r2_mlp_fd:.4f}")
 
-    best_baseline = max(r2_frame_diff, r2_untrained)
+    best_baseline = max(r2_frame_diff, r2_untrained, r2_action_only, r2_raw)
     margin = r2_diff_jepa - best_baseline
     gate_passed = margin >= 0.15
 
@@ -297,6 +302,7 @@ def main():
         wandb.summary["r2_frame_diff"] = r2_frame_diff
         wandb.summary["r2_untrained"] = r2_untrained
         wandb.summary["r2_action_only"] = r2_action_only
+        wandb.summary["r2_raw"] = r2_raw
         wandb.summary["affordance_margin"] = margin
         wandb.summary["effective_rank_ratio"] = erank_ratio
         wandb.summary["gate_passed"] = gate_passed
@@ -315,6 +321,7 @@ def main():
         "r2_frame_diff": r2_frame_diff,
         "r2_untrained": r2_untrained,
         "r2_action_only": r2_action_only,
+        "r2_raw": r2_raw,
         "r2_margin": margin,
         "gate_passed": gate_passed,
         "effective_rank": erank_diff,

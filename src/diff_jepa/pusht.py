@@ -172,11 +172,15 @@ def generate_synthetic_pusht_trajectories(
 
     trajectories: List[PushTTrajectory] = []
 
-    # Fixed deterministic projection matrix for physical world causal embedding (constant sensor geometry)
+    # Deterministic non-linear MLP sensor observation rendering
+    # Maps underlying physical state through non-linear feature expansion so raw observation is not trivially linearly invertible
     d_phys = 8
     proj_gen = torch.Generator(device=device)
     proj_gen.manual_seed(42)
-    w_causal_proj = torch.randn(d_phys, d_causal, generator=proj_gen, device=device) / math.sqrt(d_phys)
+    w_phys_1 = torch.randn(d_phys, 64, generator=proj_gen, device=device) / math.sqrt(d_phys)
+    b_phys_1 = torch.randn(64, generator=proj_gen, device=device) * 0.1
+    w_phys_2 = torch.randn(64, d_causal, generator=proj_gen, device=device) / math.sqrt(64)
+    b_phys_2 = torch.randn(d_causal, generator=proj_gen, device=device) * 0.1
 
     contact_radius = 0.25
 
@@ -222,7 +226,8 @@ def generate_synthetic_pusht_trajectories(
                 goal[0], goal[1]
             ], device=device)
 
-            causal_embed = phys_state @ w_causal_proj
+            h_phys = torch.tanh(phys_state @ w_phys_1 + b_phys_1)
+            causal_embed = h_phys @ w_phys_2 + b_phys_2
 
             # Generate dynamic clutter with high variance
             t_tensor = torch.tensor(float(t), device=device)
