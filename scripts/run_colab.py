@@ -99,11 +99,11 @@ def main():
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{repo_src}:{env.get('PYTHONPATH', '')}"
 
-    # 5. Run Stage 2 Visual Push-T Benchmark (gamma_sigreg=0.0, noise_ratio=0.80)
+    # 5. Run Stage 2 Visual Push-T Benchmark (gamma_sigreg=0.05, noise_ratio=0.80)
     cmd = [
         sys.executable, bench_script,
         "--epochs", "25",
-        "--gamma-sigreg", "0.0",
+        "--gamma-sigreg", "0.05",
         "--noise-ratio", "0.80",
         "--num-train-trajs", "80",
         "--num-val-trajs", "30",
