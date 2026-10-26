@@ -15,6 +15,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+repo_src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if repo_src not in sys.path:
+    sys.path.insert(0, repo_src)
+
 from diff_jepa.models import ConvVisualEncoder, ActionAsymmetricDualPredictor
 from diff_jepa.sigreg import SIGRegLoss
 from diff_jepa.metrics import compute_effective_rank

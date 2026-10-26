@@ -83,16 +83,21 @@ def main():
     if hasattr(signal, 'SIGALRM'):
         signal.alarm(0)
 
-    # 4. Install Dependencies
-    print("\n[Runner] Ensuring required Python dependencies...")
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    repo_src = os.path.join(repo_root, "src")
+
+    # 4. Install Dependencies & Local Package
+    print("\n[Runner] Ensuring required Python dependencies and package installation...")
     subprocess.run([
-        sys.executable, "-m", "pip", "install", "-q",
+        sys.executable, "-m", "pip", "install", "-q", "-e", repo_root,
         "wandb", "scikit-learn"
     ], check=True)
 
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     bench_script = os.path.join(repo_root, "scripts", "bench_visual_pusht.py")
     wandb_mode = os.environ.get("WANDB_MODE", "online")
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = f"{repo_src}:{env.get('PYTHONPATH', '')}"
 
     # 5. Run Stage 2 Visual Push-T Benchmark (gamma_sigreg=0.0, noise_ratio=0.80)
     cmd = [
@@ -108,7 +113,7 @@ def main():
         "--wandb-name", "diff-jepa-visual-pusht-l4"
     ]
     print(f"\n[Runner] Executing: {' '.join(cmd)}\n")
-    ret = subprocess.run(cmd, env=os.environ.copy())
+    ret = subprocess.run(cmd, env=env)
 
     # 6. Flush & Sync Offline W&B Runs
     print("\n[Runner] Syncing all W&B runs to cloud...")
@@ -126,3 +131,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
