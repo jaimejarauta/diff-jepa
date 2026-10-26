@@ -34,3 +34,18 @@ To mathematically enforce semantic directionality:
 
 Because head 2 is blind to $a_t$, it cannot predict action-induced displacements of the pusher or manipulated object. It is strictly constrained to model passive environment drift and background textures. When subtracted via $\Delta z = z_1 - \lambda z_2$, the common background mode is cancelled, leaving the action-induced affordance intact.
 
+
+## Run log 2026-10-26: benchmark and gate changes
+
+- State-space generator (`pusht.py`): raw-observation probes on the current rendering score ridge R^2 -0.09 and
+  MLP -0.73 (80 train / 20 val trajectories). Sweeping the sine scale: 0.5 -> ridge -0.21; 0.2 -> 0.27; 0.1 -> 0.78
+  (linear again). The clutter amplitude (~3x the causal signal) swamps the pose before the sine wraps, so no scale
+  is both non-trivial and recoverable. Decision: stop using the state-space benchmark; use the visual one.
+- The demonstrator in `pusht.py` is a state-feedback policy: an MLP predicts its action from the true state with
+  R^2 0.81, so a "passive" head that sees the state can predict action effects. The visual generator now has
+  `explore_prob` (random actions); at 1.0 the state -> action MLP R^2 drops from 0.18 to ~0.
+- Visual encoder: global average pooling removed position; replaced by a 4x4 grid (any input size).
+- Target: EMA target encoder (0.99), stop-gradient on both target frames.
+- Gate (revised): the probe target is absolute pose, which the predictor's delta code cannot represent, so the
+  representation under test is the encoder; it must beat untrained, raw 8x8 pixels, 8x8 frame difference and
+  action-only by >= 0.15 R^2, with encoder effective-rank ratio >= 0.70.
