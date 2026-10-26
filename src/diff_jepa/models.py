@@ -48,12 +48,15 @@ class ConvVisualEncoder(nn.Module):
             nn.Conv2d(128, 128, kernel_size=4, stride=2, padding=1),
             nn.GroupNorm(16, 128),
             nn.GELU(),
-            # Global pooling: (128, 4, 4) -> (128, 1, 1)
-            nn.AdaptiveAvgPool2d((1, 1)),
+            # Keep a 4x4 location grid (any input size) instead of global pooling, which discarded position
+            nn.AdaptiveAvgPool2d((4, 4)),
+            nn.Conv2d(128, 32, kernel_size=1),
+            nn.GroupNorm(8, 32),
+            nn.GELU(),
             nn.Flatten(),
         )
         self.proj = nn.Sequential(
-            nn.Linear(128, d_state),
+            nn.Linear(32 * 4 * 4, d_state),
             nn.LayerNorm(d_state)
         )
 

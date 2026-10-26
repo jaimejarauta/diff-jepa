@@ -43,3 +43,21 @@ def test_conv_visual_encoder_with_dual_predictor():
     
     assert diff.shape == (4, 48)
     assert not torch.isnan(diff).any()
+
+
+def test_conv_visual_encoder_any_resolution():
+    enc = ConvVisualEncoder(in_channels=3, d_state=16)
+    for size in (32, 64, 96):
+        assert enc(torch.rand(2, 3, size, size)).shape == (2, 16)
+
+
+def test_conv_visual_encoder_is_position_sensitive():
+    """A translated object must change the code: global average pooling made this ~0."""
+    torch.manual_seed(0)
+    enc = ConvVisualEncoder(in_channels=3, d_state=32).eval()
+    a = torch.zeros(1, 3, 64, 64)
+    b = torch.zeros(1, 3, 64, 64)
+    a[..., 8:16, 8:16] = 1.0
+    b[..., 40:48, 40:48] = 1.0
+    with torch.no_grad():
+        assert (enc(a) - enc(b)).norm() > 0.1 * enc(a).norm()

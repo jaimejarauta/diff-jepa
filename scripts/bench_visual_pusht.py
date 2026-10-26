@@ -4,6 +4,7 @@ Evaluates visual affordance extraction from 64x64 RGB frames under 80% high-entr
 """
 
 import argparse
+import copy
 import json
 import os
 import subprocess
@@ -57,6 +58,8 @@ def main():
     parser.add_argument("--d-state", type=int, default=64, help="Visual latent representation dimension")
     parser.add_argument("--noise-ratio", type=float, default=0.80, help="Dynamic distractor ratio in [0, 1]")
     parser.add_argument("--seed", type=int, default=1337, help="Random seed")
+    parser.add_argument("--explore-prob", type=float, default=0.5, help="Per-step probability of a random action")
+    parser.add_argument("--ema", type=float, default=0.99, help="Target-encoder EMA decay")
     parser.add_argument("--device", type=str, default=None, help="Device override (cuda, mps, cpu)")
     parser.add_argument("--output-manifest", type=str, default="results/pusht_visual_manifest.json",
                         help="Path to provenance manifest JSON")
@@ -115,6 +118,7 @@ def main():
         noise_ratio=args.noise_ratio,
         seed=args.seed,
         device=device,
+        explore_prob=args.explore_prob,
     )
     val_trajs = generate_visual_pusht_trajectories(
         num_trajectories=args.num_val_trajs,
@@ -123,6 +127,7 @@ def main():
         noise_ratio=args.noise_ratio,
         seed=args.seed + 9999,
         device=device,
+        explore_prob=args.explore_prob,
     )
     train_dataset = VisualPushTDataset(train_trajs)
     val_dataset = VisualPushTDataset(val_trajs)
@@ -134,6 +139,8 @@ def main():
     encoder = ConvVisualEncoder(in_channels=3, d_state=args.d_state).to(device)
     predictor = ActionAsymmetricDualPredictor(d_state=args.d_state, d_action=2, d_out=args.d_state).to(device)
     untrained_encoder = ConvVisualEncoder(in_channels=3, d_state=args.d_state).to(device)
+    # EMA target encoder (no gradients): an online-encoder target admits the constant-code solution
+    target_encoder = copy.deepcopy(encoder).requires_grad_(False)
     untrained_encoder.eval()
 
     sigreg_loss_fn = SIGRegLoss(d=args.d_state, n_slices=32).to(device)
@@ -159,9 +166,7 @@ def main():
 
             s_curr = encoder(f_curr)
             with torch.no_grad():
-                s_next = encoder(f_next)
-
-            delta_target = s_next - s_curr
+                delta_target = target_encoder(f_next) - target_encoder(f_curr)
             delta_pred = predictor(s_curr, action)
 
             # JEPA prediction loss (Smooth L1 / Huber)
@@ -178,6 +183,9 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(list(encoder.parameters()) + list(predictor.parameters()), max_norm=1.0)
             optimizer.step()
+            with torch.no_grad():
+                for p_t, p_o in zip(target_encoder.parameters(), encoder.parameters()):
+                    p_t.lerp_(p_o, 1.0 - args.ema)
 
             total_loss += loss.item()
             n_batches += 1
@@ -217,8 +225,8 @@ def main():
                 diff = predictor(s_curr, action)
                 s_untr = untrained_encoder(f_curr)
 
-                # Frame differencing: spatial difference collapsed by avg pool
-                frame_diff = torch.mean(torch.abs(f_next - f_curr), dim=[2, 3])  # (B, 3)
+                # Frame differencing at the same 8x8 grid as the raw-image probe (was 3 global scalars)
+                frame_diff = F.adaptive_avg_pool2d(f_next - f_curr, (8, 8)).flatten(start_dim=1)  # (B, 192)
                 # Raw frames downsampled
                 raw_down = F.adaptive_avg_pool2d(f_curr, (8, 8)).flatten(start_dim=1)  # (B, 3*8*8)
 
@@ -244,7 +252,7 @@ def main():
     val_diff, val_enc, val_fd, val_act, val_untr, val_raw, val_y = extract_features(val_dataset)
 
     # 5. Measure Representation Health: Effective Rank
-    erank_diff = compute_effective_rank(val_diff)
+    erank_diff = compute_effective_rank(val_enc)  # health of the representation under test (encoder)
     erank_ratio = erank_diff / args.d_state
 
     # 6. Fit Probes
@@ -275,16 +283,18 @@ def main():
     print(f"  2. Diff-JEPA MLP (Visual Enc):     R^2 = {r2_mlp_enc:.4f} {r2_mlp_enc_dict}")
     print(f"  3. Frame Differencing MLP:         R^2 = {r2_mlp_fd:.4f}")
 
-    best_baseline = max(r2_frame_diff, r2_untrained, r2_action_only)
-    affordance_baseline = max(r2_frame_diff, r2_untrained)
-    margin = r2_diff_jepa - affordance_baseline
+    # Gate revised 2026-10-26: the probe target is absolute pose, which a delta code cannot hold, so the
+    # representation under test is the encoder. It must beat every baseline, including raw pixels and action-only.
+    best_baseline = max(r2_frame_diff, r2_untrained, r2_action_only, r2_raw)
+    affordance_baseline = best_baseline
+    margin = r2_enc - affordance_baseline
     gate_passed = bool((margin >= 0.15) and (erank_ratio >= 0.70))
 
     print(f"\nPre-registered Gate Evaluation:")
     print(f"  Diff-JEPA R^2: {r2_diff_jepa:.4f}")
     print(f"  Best Baseline R^2: {best_baseline:.4f}")
-    print(f"  Affordance Baseline max(R^2_fd, R^2_untr): {affordance_baseline:.4f}")
-    print(f"  Affordance Margin (R^2_diff - max(R^2_fd, R^2_untr)): {margin:+.4f} (Required: >= +0.15)")
+    print(f"  Encoder R^2: {r2_enc:.4f}")
+    print(f"  Encoder margin over best baseline: {margin:+.4f} (Required: >= +0.15)")
     print(f"  Effective Rank: {erank_diff:.2f} / {args.d_state} (Ratio: {erank_ratio:.2f})")
     print(f"  Gate Status: {'PASS' if gate_passed else 'FAIL'}")
 

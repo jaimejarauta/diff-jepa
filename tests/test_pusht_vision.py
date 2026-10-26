@@ -72,3 +72,16 @@ def test_visual_pusht_dataset_and_dataloader():
     assert batch["frame_next"].shape == (4, 3, 32, 32)
     assert batch["action"].shape == (4, 2)
     assert batch["target_pose"].shape == (4, 4)
+
+
+def test_exploratory_actions_decouple_action_from_state():
+    from diff_jepa.pusht import fit_mlp_probe
+    def r2(explore):
+        tr = generate_visual_pusht_trajectories(60, 30, img_size=16, seed=1, explore_prob=explore)
+        va = generate_visual_pusht_trajectories(20, 30, img_size=16, seed=2, explore_prob=explore)
+        S = lambda ts: torch.cat([t.states[:-1] for t in ts])
+        A = lambda ts: torch.cat([t.actions for t in ts])
+        torch.manual_seed(0)
+        return fit_mlp_probe(S(tr), A(tr), S(va), A(va), epochs=200, dim_names=["ax", "ay"])[0]
+    # pushing policy: action partly predictable from state (~0.18); full exploration: not at all
+    assert r2(1.0) < 0.05 < r2(0.0)

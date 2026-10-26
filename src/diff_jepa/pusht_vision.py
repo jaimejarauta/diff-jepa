@@ -145,6 +145,7 @@ def generate_visual_pusht_trajectories(
     noise_ratio: float = 0.80,
     seed: int = 1337,
     device: Optional[torch.device] = None,
+    explore_prob: float = 0.0,
 ) -> List[VisualPushTTrajectory]:
     """Simulates physical planar Push-T interactions and renders full visual image streams
     corrupted by controllable dynamic background clutter.
@@ -153,6 +154,8 @@ def generate_visual_pusht_trajectories(
         trajectory_length: Sequence length per trajectory (T).
         img_size: Frame resolution (H=W=img_size).
         noise_ratio: Fraction of visual background clutter in [0, 1].
+        explore_prob: Per-step probability of a uniform random action instead of the pushing policy;
+            > 0 breaks the state -> action dependence a passive head could otherwise exploit.
         seed: Random seed.
         device: Computation device.
     Returns:
@@ -241,6 +244,9 @@ def generate_visual_pusht_trajectories(
                 act_noise_y = (torch.rand(1, generator=gen, device=device).item() - 0.5) * 0.08
                 act_x = 0.04 * push_dir_x + act_noise_x
                 act_y = 0.04 * push_dir_y + act_noise_y
+                if torch.rand(1, generator=gen, device=device).item() < explore_prob:
+                    act_x = (torch.rand(1, generator=gen, device=device).item() - 0.5) * 0.12
+                    act_y = (torch.rand(1, generator=gen, device=device).item() - 0.5) * 0.12
                 actions.append(torch.tensor([act_x, act_y], device=device))
 
                 # Update robot kinematics
