@@ -21,6 +21,60 @@ class VisualStateEncoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
+class ConvVisualEncoder(nn.Module):
+    """Convolutional visual encoder mapping (B, C, H, W) camera frames or (B, T, C, H, W)
+    video sequences to compact physical state latent representations.
+    """
+    def __init__(self, in_channels: int = 3, d_state: int = 64):
+        super().__init__()
+        self.in_channels = in_channels
+        self.d_state = d_state
+
+        # 4-stage convolutional hierarchy
+        self.backbone = nn.Sequential(
+            # Stage 1: (C, 64, 64) -> (32, 32, 32)
+            nn.Conv2d(in_channels, 32, kernel_size=4, stride=2, padding=1),
+            nn.GroupNorm(4, 32),
+            nn.GELU(),
+            # Stage 2: (32, 32, 32) -> (64, 16, 16)
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1),
+            nn.GroupNorm(8, 64),
+            nn.GELU(),
+            # Stage 3: (64, 16, 16) -> (128, 8, 8)
+            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),
+            nn.GroupNorm(16, 128),
+            nn.GELU(),
+            # Stage 4: (128, 8, 8) -> (128, 4, 4)
+            nn.Conv2d(128, 128, kernel_size=4, stride=2, padding=1),
+            nn.GroupNorm(16, 128),
+            nn.GELU(),
+            # Global pooling: (128, 4, 4) -> (128, 1, 1)
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(),
+        )
+        self.proj = nn.Sequential(
+            nn.Linear(128, d_state),
+            nn.LayerNorm(d_state)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Args:
+            x: (B, C, H, W) or (B, T, C, H, W) image tensor.
+        Returns:
+            (B, d_state) or (B, T, d_state) latent representation.
+        """
+        if x.dim() == 5:
+            b, t, c, h, w = x.shape
+            x_flat = x.view(b * t, c, h, w)
+            feats = self.backbone(x_flat)
+            out = self.proj(feats)
+            return out.view(b, t, -1)
+        elif x.dim() == 4:
+            feats = self.backbone(x)
+            return self.proj(feats)
+        else:
+            raise ValueError(f"Expected 4D (B, C, H, W) or 5D (B, T, C, H, W) tensor, got {x.shape}")
+
 class ActionAsymmetricDualPredictor(nn.Module):
     """Predictor with an action-conditioned causal head and an unconditioned passive background head."""
     def __init__(self, d_state: int, d_action: int, d_out: int,

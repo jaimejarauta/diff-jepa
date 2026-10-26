@@ -284,13 +284,15 @@ def main():
     print(f"  2. Diff-JEPA MLP (Visual Enc):     R^2 = {r2_mlp_enc:.4f} {r2_mlp_enc_dict}")
     print(f"  3. Frame Differencing MLP:         R^2 = {r2_mlp_fd:.4f}")
 
-    best_baseline = max(r2_frame_diff, r2_untrained, r2_action_only, r2_raw)
-    margin = r2_diff_jepa - best_baseline
-    gate_passed = margin >= 0.15
+    best_baseline = max(r2_frame_diff, r2_untrained, r2_action_only)
+    affordance_baseline = max(r2_frame_diff, r2_untrained)
+    margin = r2_diff_jepa - affordance_baseline
+    gate_passed = bool((margin >= 0.15) and (erank_ratio >= 0.70))
 
     print(f"\nPre-registered Gate Evaluation:")
     print(f"  Diff-JEPA R^2: {r2_diff_jepa:.4f}")
     print(f"  Best Baseline R^2: {best_baseline:.4f}")
+    print(f"  Affordance Baseline max(R^2_fd, R^2_untr): {affordance_baseline:.4f}")
     print(f"  Affordance Margin (R^2_diff - max(R^2_fd, R^2_untr)): {margin:+.4f} (Required: >= +0.15)")
     print(f"  Effective Rank: {erank_diff:.2f} / {d_total} (Ratio: {erank_ratio:.2f})")
     print(f"  Gate Status: {'PASS' if gate_passed else 'FAIL'}")
