@@ -181,6 +181,8 @@ def generate_synthetic_pusht_trajectories(
     b_phys_1 = torch.randn(64, generator=proj_gen, device=device) * 0.1
     w_phys_2 = torch.randn(64, d_causal, generator=proj_gen, device=device) / math.sqrt(64)
     b_phys_2 = torch.randn(d_causal, generator=proj_gen, device=device) * 0.1
+    # Orthogonal mixing matrix for complex sensory rendering (simulating non-linear camera pixels)
+    w_mix, _ = torch.linalg.qr(torch.randn(d_total, d_total, generator=proj_gen, device=device))
 
     contact_radius = 0.25
 
@@ -238,7 +240,9 @@ def generate_synthetic_pusht_trajectories(
             noise_jitter = torch.randn(d_noise, generator=gen, device=device) * 0.3
             bg_clutter = bg_baseline + harmonic_term + noise_jitter
 
-            obs_raw[t] = torch.cat([causal_embed, bg_clutter], dim=-1)
+            unmixed = torch.cat([causal_embed, bg_clutter], dim=-1)
+            # High-dimensional non-linear sensory rendering (camera projection simulation)
+            obs_raw[t] = torch.sin((unmixed @ w_mix) * 2.0)
 
             if t < trajectory_length - 1:
                 # Expert demonstrator policy: move agent toward block, then push block toward goal
